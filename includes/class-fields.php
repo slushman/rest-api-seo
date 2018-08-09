@@ -21,35 +21,30 @@ class Fields {
 	 */
 	public function hooks() {
 
-		add_action( 'rest_api_init', array( $this, 'add_meta_fields' ) );
+		add_action( 'rest_api_init', array( $this, 'register_fields' ) );
 
 	} // hooks()
 
 	/**
-	 * Registers fields for the REST requests for posts and pages.
+	 * Registers fields for the REST requests.
 	 * 
 	 * @hooked 		rest_api_init
 	 * @since 		1.0.0
 	 */
-	public function add_meta_fields() {
+	public function register_fields() {
 
-		register_rest_field( 'post', 'yoast', array(
-			'get_callback' 	=> array( $this, 'add_yoast_meta' ),
-			'schema' 		=> null
-		));
+		// register_rest_field( 'category', 'yoast', array(
+		// 	'get_callback' 	=> array( $this, 'add_yoast_meta_for_category' ),
+		// 	'schema' 		=> null
+		// ));
 
 		register_rest_field( 'page', 'yoast', array(
 			'get_callback' 	=> array( $this, 'add_yoast_meta' ),
 			'schema' 		=> null
 		));
 
-		register_rest_field( 'category', 'yoast', array(
-			'get_callback' 	=> array( $this, 'add_yoast_meta_for_category' ),
-			'schema' 		=> null
-		));
-
-		register_rest_field( 'tag', 'yoast', array(
-			'get_callback' 	=> array( $this, 'add_yoast_meta_for_tag' ),
+		register_rest_field( 'post', 'yoast', array(
+			'get_callback' 	=> array( $this, 'add_yoast_meta' ),
 			'schema' 		=> null
 		));
 
@@ -67,7 +62,12 @@ class Fields {
 
 		}
 
-	} // add_meta_fields()
+		// register_rest_field( 'tag', 'yoast', array(
+		// 	'get_callback' 	=> array( $this, 'add_yoast_meta_for_tag' ),
+		// 	'schema' 		=> null
+		// ));
+
+	} // register_fields()
 
 	/**
 	 * Adds Yoast SEO metadata to the JSON data returned via the REST API.
@@ -87,19 +87,18 @@ class Fields {
 
 		the_post();
 
-		$yoastMeta['title'] 		= $frontend->get_content_title();
-		$yoastMeta['metadesc']		= $frontend->metadesc( false );
-		$yoastMeta['canonical'] 	= $frontend->canonical( false );
-		// $yoastMeta['opengraph_title'] 		= ! empty( $meta['_yoast_wpseo_opengraph-title'] ) ? $meta['_yoast_wpseo_opengraph-title'] : '';
-		// $yoastMeta['opengraph_description'] = ! empty( $meta['_yoast_wpseo_opengraph-description'] ) ? $meta['_yoast_wpseo_opengraph-description'] : '';
-		// $yoastMeta['opengraph_image'] 		= ! empty( $meta['_yoast_wpseo_opengraph-image'] ) ? $meta['_yoast_wpseo_opengraph-image'] : '';
-		// $yoastMeta['twitter_title'] 		= ! empty( $meta['_yoast_wpseo_twitter-title'] ) ? $meta['_yoast_wpseo_twitter-title'] : '';
-		// $yoastMeta['twitter_description'] 	= ! empty( $meta['_yoast_wpseo_twitter-description'] ) ? $meta['_yoast_wpseo_twitter-description'] : '';
-		// $yoastMeta['twitter_image'] 		= ! empty( $meta['_yoast_wpseo_twitter-image'] ) ? $meta['_yoast_wpseo_twitter-image'] : '';
-		// $yoastMeta['meta_robots_noindex'] 	= ! empty( $meta['_yoast_wpseo_meta-robots-noindex'] ) ? $meta['_yoast_wpseo_meta-robots-noindex'] : '';
-		// $yoastMeta['meta_robots_nofollow'] 	= ! empty( $meta['_yoast_wpseo_meta-robots-nofollow'] ) ? $meta['_yoast_wpseo_meta-robots-nofollow'] : '';
-		// $yoastMeta['meta_robots_adv'] 		= ! empty( $meta['_yoast_wpseo_meta-robots-adv'] ) ? $meta['_yoast_wpseo_meta-robots-adv'] : '';
-		// $yoastMeta['redirect'] 				= ! empty( $meta['_yoast_wpseo_redirect'] ) ? $meta['_yoast_wpseo_redirect'] : '';
+		$yoastMeta['title'] 				= $frontend->get_content_title();
+		$yoastMeta['metadesc']				= $frontend->metadesc( false );
+		$yoastMeta['canonical'] 			= $frontend->canonical( false );
+		$yoastMeta['opengraph_title'] 		= $this->get_social_meta( get_the_ID(), 'opengraph', 'title', $frontend );
+		$yoastMeta['opengraph_description'] = $this->get_social_meta( get_the_ID(), 'opengraph', 'description', $frontend );
+		$yoastMeta['opengraph_image'] 		= $this->get_social_meta( get_the_ID(), 'opengraph', 'image', $frontend );
+		$yoastMeta['twitter_title'] 		= $this->get_social_meta( get_the_ID(), 'twitter', 'title', $frontend );
+		$yoastMeta['twitter_description'] 	= $this->get_social_meta( get_the_ID(), 'twitter', 'description', $frontend );
+		$yoastMeta['twitter_image'] 		= $this->get_social_meta( get_the_ID(), 'twitter', 'image', $frontend );
+		$yoastMeta['meta_robots_noindex'] 	= get_post_meta( get_the_ID(), '_yoast_wpseo_meta-robots-noindex' );
+		$yoastMeta['meta_robots_nofollow'] 	= get_post_meta( get_the_ID(), '_yoast_wpseo_meta-robots-nofollow' );
+		$yoastMeta['meta_robots_adv'] 		= get_post_meta( get_the_ID(), '_yoast_wpseo_meta-robots-adv'  );
 
 		wp_reset_query();
 
@@ -115,15 +114,36 @@ class Fields {
 	 */
 	public function add_yoast_meta_for_category( $category ) {
 
-		$query['cat'] = $category['id'];
+		$frontend = \WPSEO_Frontend::get_instance();
+		$frontend->reset();
 
-		query_posts( $query );
+		$queryArgs['cat'] 	= $category['id'];
+		$query 				= new \WP_Query( $queryArgs );
+		$yoastMeta 			= array();
 
-		the_post();
+		if ( $query->have_posts() ) :
 
-		$yoastMeta = $this->add_yoast_meta_taxonomy();
+			while( $query->have_posts() ) :
 
-		wp_reset_query();
+				$query->the_post();
+
+				$yoastMeta['title'] 	= $frontend->get_taxonomy_title();
+				$yoastMeta['metadesc']	= $frontend->metadesc( false );
+
+			endwhile;
+
+		endif;
+
+		// query_posts( $queryArgs );
+		
+		// the_post();
+
+		//$yoastMeta['title'] 	= $frontend->get_taxonomy_title();
+		//$yoastMeta['metadesc']	= $frontend->metadesc( false );
+
+		//$yoastMeta = $this->add_yoast_meta_taxonomy();
+
+		//wp_reset_query();
 
 		return $yoastMeta;
 
@@ -168,5 +188,46 @@ class Fields {
 		return $yoastMeta;
 
 	} // add_yoast_meta_taxonomy()
+
+	/**
+	 * Returns the requested field or its fallback.
+	 * 
+	 * @since 		1.0.0
+	 * @param 		int 				$postID 		The post ID.
+	 * @param 		string 				$network 		The social network.
+	 * 														opengraph or twitter
+	 * @param 		string 				$field 			The field name.
+	 * 														title, description, or image
+	 * @param 		WPSEO_Frontend 		$frontend 		Instance of WPSEO_Frontend
+	 * @return 		string 								The meta data.
+	 */
+	public function get_social_meta( $postID, $network, $field, $frontend ) {
+
+		$metaKey 	= '_yoast_wpseo_' . strtolower( $network ) . '-' . strtolower( $field );
+		$metaData 	= get_post_meta( $postID, $metaKey, true );
+
+		if ( is_string( $metaData ) && '' !== $metaData && ! empty( $metaData ) ) {
+
+			return $metaData;
+
+		} 
+
+		if ( 'title' === $field ) {
+
+			$metaData = $frontend->get_content_title();
+
+		} elseif ( 'description' === $field ) {
+
+			$metaData = $frontend->metadesc( false );
+
+		} else {
+
+			$metaData = \WPSEO_Options::get( 'og_default_image' );
+
+		}
+
+		return $metaData;
+
+	} // get_social_meta()
 
 } // class
